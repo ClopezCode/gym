@@ -1,0 +1,160 @@
+.progress-page {
+  padding: var(--page-pad-y) var(--page-pad-x);
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.progress-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: var(--section-space);
+}
+
+.progress-page__title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin: 0 0 0.35rem;
+}
+
+.progress-page__subtitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.progress-page__back {
+  color: var(--nav-fg);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.progress-page__back:hover {
+  text-decoration: underline;
+  color: var(--nav-fg-hover);
+}
+
+.progress-page__error {
+  color: #dc2626;
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+.progress-page__section {
+  margin-bottom: var(--section-space);
+  padding: 1.35rem 1.3rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  box-shadow: var(--card-shadow);
+}
+
+.progress-page__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.08rem;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.progress-page__hint {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.progress-page__status,
+.progress-page__empty {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.progress-page__chart {
+  width: 100%;
+  min-height: 280px;
+}
+
+.progress-page__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-h);
+  margin-bottom: 0.35rem;
+}
+
+.progress-page__select {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  margin-bottom: 0.5rem;
+}
+
+.progress-page__exercise-link-wrap {
+  margin: 0 0 1rem;
+}
+
+.progress-page__exercise-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--nav-fg);
+}
+
+.progress-page__exercise-link:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .progress-page {
+    max-width: none;
+  }
+
+  .progress-page__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .progress-page__back {
+    order: -1;
+    align-self: flex-start;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .progress-page__title {
+    font-size: 1.65rem;
+  }
+
+  .progress-page__section {
+    padding: 1.1rem 1rem;
+  }
+
+  .progress-page__select {
+    max-width: none;
+    min-height: 48px;
+    box-sizing: border-box;
+  }
+
+  .progress-page__chart {
+    min-height: 240px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-page__error {
+    color: #f87171;
+  }
+}

@@ -1,0 +1,268 @@
+:root {
+  --text: #5c5648;
+  --text-h: #14110a;
+  --bg: #faf8f5;
+  --border: color-mix(in srgb, var(--text-h) 7%, var(--bg));
+  --border-hover: color-mix(in srgb, var(--text-h) 14%, var(--bg));
+  --code-bg: #f2efe9;
+  --accent: #b8860b;
+  --accent-bg: rgba(184, 134, 11, 0.12);
+  --accent-border: rgba(184, 134, 11, 0.42);
+  --accent-fg: #1a1408;
+  --nav-fg: #69645c;
+  --nav-fg-hover: var(--text-h);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --page-pad-y: 2.85rem;
+  --page-pad-x: max(1.5rem, 5vw);
+  --section-space: 2.85rem;
+  --card-shadow:
+    0 1px 2px rgba(20, 17, 10, 0.03), 0 3px 14px rgba(20, 17, 10, 0.05);
+  --card-shadow-hover:
+    0 2px 14px rgba(20, 17, 10, 0.07), 0 6px 24px rgba(20, 17, 10, 0.06);
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+  --social-bg: rgba(244, 240, 232, 0.65);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: 'Outfit', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Outfit', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+
+  @media (max-width: 640px) {
+    --page-pad-y: max(1.1rem, env(safe-area-inset-top, 0px));
+    --page-pad-x: max(
+      0.85rem,
+      env(safe-area-inset-left, 0px),
+      env(safe-area-inset-right, 0px)
+    );
+    --section-space: 1.6rem;
+    font-size: 17px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #0f1117;
+    --border: rgba(255, 255, 255, 0.065);
+    --border-hover: rgba(255, 255, 255, 0.12);
+    --code-bg: #161922;
+    --accent: #d4af37;
+    --accent-bg: rgba(212, 175, 55, 0.14);
+    --accent-border: rgba(212, 175, 55, 0.48);
+    --accent-fg: #14110a;
+    --nav-fg: #9ca3af;
+    --nav-fg-hover: #f3f4f6;
+    --card-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.35), 0 5px 20px rgba(0, 0, 0, 0.28);
+    --card-shadow-hover:
+      0 2px 16px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.22);
+    --social-bg: rgba(47, 48, 58, 0.5);
+    --shadow:
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  position: relative;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1126px;
+  margin: 0 auto;
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+  background: transparent;
+  overflow-x: clip;
+}
+
+/* Hijo flex con min-width:auto no se encoge → contenido ancho empuja fuera del viewport */
+#root > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  #root {
+    border-inline: none;
+    max-width: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  body::before {
+    left: 0;
+    transform: none;
+    width: 100%;
+    background-position: center 30%;
+    background-size: min(58vmin, 300px) auto;
+  }
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1126px, 100%);
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: url('./assets/Vision.png') center 38% / min(46vmin, 340px) auto
+    no-repeat;
+  opacity: 0.055;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--heading);
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+a {
+  transition:
+    color 0.2s var(--ease-ui),
+    opacity 0.2s var(--ease-ui),
+    border-color 0.2s var(--ease-ui),
+    background-color 0.2s var(--ease-ui),
+    box-shadow 0.2s var(--ease-ui);
+}
+
+button {
+  transition:
+    filter 0.2s var(--ease-ui),
+    border-color 0.2s var(--ease-ui),
+    background-color 0.2s var(--ease-ui),
+    box-shadow 0.2s var(--ease-ui),
+    color 0.2s var(--ease-ui);
+}
+
+input,
+select,
+textarea {
+  transition:
+    border-color 0.2s var(--ease-ui),
+    box-shadow 0.2s var(--ease-ui),
+    outline-color 0.2s var(--ease-ui);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  padding: 2rem;
+  color: var(--text);
+  font-family: var(--heading);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
