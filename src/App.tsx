@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { ProgressPage } from './pages/ProgressPage'
 import { RoutinesPage } from './pages/RoutinesPage'
 import { LoginPage } from './pages/LoginPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { WorkoutHistoryDetailPage } from './pages/WorkoutHistoryDetailPage'
 import { WorkoutPage } from './pages/WorkoutPage'
 
@@ -16,6 +17,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/progress" element={<ProgressPage />} />

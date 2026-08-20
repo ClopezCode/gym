@@ -43,6 +43,28 @@ export async function signInWithEmail(
   }
 }
 
+/**
+ * Envía el correo con el enlace de recuperación. `redirectTo` debe estar dado
+ * de alta en Supabase (Authentication → URL Configuration → Redirect URLs).
+ */
+export async function sendPasswordResetEmail(
+  email: string,
+  redirectTo: string,
+): Promise<{ error: AuthError | null }> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  })
+  return { error }
+}
+
+/** Cambia la contraseña del usuario con sesión activa. */
+export async function updatePassword(
+  password: string,
+): Promise<{ error: AuthError | null }> {
+  const { error } = await supabase.auth.updateUser({ password })
+  return { error }
+}
+
 export async function signOut(): Promise<{ error: AuthError | null }> {
   const { error } = await supabase.auth.signOut()
   return { error }

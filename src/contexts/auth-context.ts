@@ -11,6 +11,8 @@ export type AuthContextValue = {
     needsEmailConfirmation: boolean
   }>
   signOut: () => Promise<AuthError | null>
+  requestPasswordReset: (email: string) => Promise<AuthError | null>
+  updatePassword: (password: string) => Promise<AuthError | null>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

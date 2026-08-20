@@ -49,7 +49,17 @@ export async function createWorkout(): Promise<CreateWorkoutResult> {
 }
 
 export type GetWorkoutSuccess = { ok: true; workout: Workout }
-export type GetWorkoutFailure = { ok: false; message: string }
+
+/**
+ * `not_found` significa que la consulta funcionó y el entreno no existe.
+ * `error` significa que no se pudo comprobar (red caída, sesión, permisos).
+ */
+export type GetWorkoutFailure = {
+  ok: false
+  reason: 'not_found' | 'error'
+  message: string
+}
+
 export type GetWorkoutResult = GetWorkoutSuccess | GetWorkoutFailure
 
 /**
@@ -62,10 +72,10 @@ export async function getWorkoutById(workoutId: string): Promise<GetWorkoutResul
   } = await supabase.auth.getUser()
 
   if (authError) {
-    return { ok: false, message: authError.message }
+    return { ok: false, reason: 'error', message: authError.message }
   }
   if (!user) {
-    return { ok: false, message: 'No hay sesión activa.' }
+    return { ok: false, reason: 'error', message: 'No hay sesión activa.' }
   }
 
   const { data, error } = await supabase
@@ -76,10 +86,14 @@ export async function getWorkoutById(workoutId: string): Promise<GetWorkoutResul
     .maybeSingle()
 
   if (error) {
-    return { ok: false, message: error.message }
+    return { ok: false, reason: 'error', message: error.message }
   }
   if (!data) {
-    return { ok: false, message: 'Entrenamiento no encontrado o sin permiso.' }
+    return {
+      ok: false,
+      reason: 'not_found',
+      message: 'Entrenamiento no encontrado o sin permiso.',
+    }
   }
 
   return { ok: true, workout: data as Workout }
@@ -143,8 +157,9 @@ function buildReplaceWorkoutSetsPayload(
 }
 
 /**
- * Si `workoutId` es válido y existe para el usuario, lo usa.
- * Si no hay id o el entrenamiento no existe, crea un workout nuevo.
+ * Si `workoutId` existe para el usuario, lo usa. Solo crea uno nuevo cuando no
+ * hay id o se confirma que el entreno no existe: si la comprobación falla por
+ * red o sesión se aborta, porque crear otro dejaría un duplicado en el historial.
  */
 async function resolveWorkoutIdForSave(
   workoutId: string | null | undefined,
@@ -153,6 +168,9 @@ async function resolveWorkoutIdForSave(
     const existing = await getWorkoutById(workoutId)
     if (existing.ok) {
       return { ok: true, workoutId: existing.workout.id }
+    }
+    if (existing.reason === 'error') {
+      return { ok: false, message: existing.message }
     }
   }
 

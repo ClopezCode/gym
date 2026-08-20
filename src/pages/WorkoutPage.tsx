@@ -3,6 +3,14 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { SessionExerciseCard } from '../components/SessionExerciseCard'
 import { useWorkoutExercises } from '../hooks/useWorkoutExercises'
 import { parseRepsInput, parseWeightInput } from '../lib/parseSetInputs'
+import { sessionExercisesFromWorkoutSets } from '../lib/sessionFromWorkoutSets'
+import {
+  clearWorkoutDraft,
+  readWorkoutDraft,
+  saveWorkoutDraft,
+  sessionSignature,
+  type WorkoutDraft,
+} from '../lib/workoutDraftStorage'
 import { getRoutineTemplateWithExercises } from '../services/routineTemplateService'
 import { getSetsForWorkout } from '../services/setService'
 import {
@@ -18,6 +26,19 @@ const emptyDraft = (): SetDraft => ({ weight: '', reps: '' })
 
 type LocationState = { templateId?: string }
 
+function formatDraftMoment(isoDate: string): string {
+  const date = new Date(isoDate)
+  if (Number.isNaN(date.getTime())) {
+    return 'hace un momento'
+  }
+  return date.toLocaleString(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export function WorkoutPage() {
   const { workoutId } = useParams<{ workoutId: string }>()
   const navigate = useNavigate()
@@ -32,6 +53,8 @@ export function WorkoutPage() {
   )
   const [isSessionHydrated, setIsSessionHydrated] = useState(false)
   const [savedSetCount, setSavedSetCount] = useState(0)
+  const [savedSignature, setSavedSignature] = useState('')
+  const [pendingDraft, setPendingDraft] = useState<WorkoutDraft | null>(null)
 
   const {
     catalog,
@@ -41,9 +64,12 @@ export function WorkoutPage() {
     isAdding,
     addError,
     addExerciseByName,
-    hydrateSessionFromSets,
+    hydrateSession,
     seedSessionWithExercises,
     addSetToExercise,
+    updateSetInExercise,
+    removeSetFromExercise,
+    removeExerciseFromSession,
   } = useWorkoutExercises()
 
   const [exerciseName, setExerciseName] = useState('')
@@ -69,6 +95,7 @@ export function WorkoutPage() {
       setWorkout(null)
       setIsSessionHydrated(false)
       setSavedSetCount(0)
+      setPendingDraft(null)
 
       const result = await getWorkoutById(workoutId)
       if (cancelled) return
@@ -86,8 +113,22 @@ export function WorkoutPage() {
         return
       }
 
-      hydrateSessionFromSets(setsResult.sets)
+      const fromDatabase = sessionExercisesFromWorkoutSets(setsResult.sets)
+      const databaseSignature = sessionSignature(fromDatabase)
+
+      hydrateSession(fromDatabase)
       setSavedSetCount(setsResult.sets.length)
+      setSavedSignature(databaseSignature)
+
+      // Un borrador que coincide con lo persistido no aporta nada: se descarta
+      // en silencio para no molestar con un aviso vacío.
+      const draft = readWorkoutDraft(workoutId)
+      if (draft && sessionSignature(draft.sessionExercises) !== databaseSignature) {
+        setPendingDraft(draft)
+      } else if (draft) {
+        clearWorkoutDraft(workoutId)
+      }
+
       setIsSessionHydrated(true)
       setWorkout(result.workout)
       setIsWorkoutLoading(false)
@@ -96,7 +137,7 @@ export function WorkoutPage() {
     return () => {
       cancelled = true
     }
-  }, [workoutId, hydrateSessionFromSets])
+  }, [workoutId, hydrateSession])
 
   useEffect(() => {
     if (!workoutId || !templateIdFromNav || !workout || !isSessionHydrated) {
@@ -127,6 +168,41 @@ export function WorkoutPage() {
     navigate,
     location.pathname,
   ])
+
+  // Copia local de lo que aún no está en Supabase, para sobrevivir a recargas,
+  // cierres del navegador y a que el móvil descarte la pestaña. No se escribe
+  // mientras hay un borrador pendiente de decisión, o lo sobrescribiría.
+  useEffect(() => {
+    if (!workoutId || !isSessionHydrated || pendingDraft) {
+      return
+    }
+
+    if (sessionSignature(sessionExercises) === savedSignature) {
+      clearWorkoutDraft(workoutId)
+      return
+    }
+
+    saveWorkoutDraft(workoutId, sessionExercises)
+  }, [
+    workoutId,
+    isSessionHydrated,
+    pendingDraft,
+    sessionExercises,
+    savedSignature,
+  ])
+
+  function restorePendingDraft() {
+    if (!pendingDraft) return
+    hydrateSession(pendingDraft.sessionExercises)
+    setPendingDraft(null)
+  }
+
+  function discardPendingDraft() {
+    if (workoutId) {
+      clearWorkoutDraft(workoutId)
+    }
+    setPendingDraft(null)
+  }
 
   async function handleAddExercise(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -207,6 +283,11 @@ export function WorkoutPage() {
         return
       }
       setSavedSetCount(result.setsSaved)
+      setSavedSignature(sessionSignature(sessionExercises))
+      clearWorkoutDraft(result.workoutId)
+      if (workoutId && workoutId !== result.workoutId) {
+        clearWorkoutDraft(workoutId)
+      }
       setSaveSuccess(
         result.setsSaved === 0
           ? 'Guardado (sin series).'
@@ -269,6 +350,32 @@ export function WorkoutPage() {
           ← Inicio
         </Link>
       </header>
+
+      {pendingDraft ? (
+        <div className="workout-page__draft" role="status">
+          <p className="workout-page__draft-text">
+            Tienes cambios sin guardar de este entreno, de{' '}
+            <strong>{formatDraftMoment(pendingDraft.savedAt)}</strong>. Se
+            quedaron en este dispositivo al cerrarse la página.
+          </p>
+          <div className="workout-page__draft-actions">
+            <button
+              type="button"
+              className="workout-page__draft-restore"
+              onClick={restorePendingDraft}
+            >
+              Recuperarlos
+            </button>
+            <button
+              type="button"
+              className="workout-page__draft-discard"
+              onClick={discardPendingDraft}
+            >
+              Descartar
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <section
         className="workout-page__section"
@@ -350,6 +457,11 @@ export function WorkoutPage() {
                     }))
                   }
                   onSubmitSet={handleSubmitSetForExercise(id)}
+                  onUpdateSet={(localId, weight, reps) =>
+                    updateSetInExercise(id, localId, weight, reps)
+                  }
+                  onRemoveSet={(localId) => removeSetFromExercise(id, localId)}
+                  onRemoveExercise={() => removeExerciseFromSession(id)}
                 />
               )
             })}

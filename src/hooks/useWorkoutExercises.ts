@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Exercise } from '../types/exercise'
 import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
-import type { WorkoutSetWithExercise } from '../types/workoutSet'
 import { ensureExercise, listUserExercises } from '../services/exerciseService'
-import { sessionExercisesFromWorkoutSets } from '../lib/sessionFromWorkoutSets'
+import {
+  removeExerciseFromSession,
+  removeSetFromSession,
+  updateSetInSession,
+} from '../lib/sessionMutations'
 
 function newLocalSetId(): string {
   return crypto.randomUUID()
@@ -13,6 +16,16 @@ export type AddSetResult =
   | { ok: true }
   | { ok: false; message: string }
 
+function validateSetValues(weight: number, reps: number): AddSetResult {
+  if (!Number.isFinite(weight) || weight < 0) {
+    return { ok: false, message: 'Indica un peso válido (≥ 0).' }
+  }
+  if (!Number.isInteger(reps) || reps < 1) {
+    return { ok: false, message: 'Las repeticiones deben ser un entero ≥ 1.' }
+  }
+  return { ok: true }
+}
+
 export type UseWorkoutExercisesState = {
   catalog: Exercise[]
   sessionExercises: SessionExercise[]
@@ -21,13 +34,21 @@ export type UseWorkoutExercisesState = {
   isAdding: boolean
   addError: string | null
   addExerciseByName: (rawName: string) => Promise<void>
-  hydrateSessionFromSets: (sets: WorkoutSetWithExercise[]) => void
+  hydrateSession: (session: SessionExercise[]) => void
   seedSessionWithExercises: (exercises: Exercise[]) => void
   addSetToExercise: (
     exerciseId: string,
     weight: number,
     reps: number,
   ) => AddSetResult
+  updateSetInExercise: (
+    exerciseId: string,
+    localId: string,
+    weight: number,
+    reps: number,
+  ) => AddSetResult
+  removeSetFromExercise: (exerciseId: string, localId: string) => void
+  removeExerciseFromSession: (exerciseId: string) => void
 }
 
 /**
@@ -93,25 +114,22 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
   }, [])
 
   /**
-   * Reemplaza la sesión con las series ya persistidas del entreno. Debe correr
-   * antes de cualquier guardado: `replace_workout_sets` borra lo que no esté aquí.
+   * Reemplaza por completo la sesión, ya venga de la base de datos o de un
+   * borrador local. Debe correr antes de cualquier guardado:
+   * `replace_workout_sets` borra del entreno todo lo que no esté aquí.
    */
-  const hydrateSessionFromSets = useCallback(
-    (sets: WorkoutSetWithExercise[]) => {
-      const hydrated = sessionExercisesFromWorkoutSets(sets)
-      setSessionExercises(hydrated)
-      setCatalog((prev) => {
-        const byId = new Map(prev.map((e) => [e.id, e]))
-        for (const row of hydrated) {
-          byId.set(row.exercise.id, row.exercise)
-        }
-        return [...byId.values()].sort((a, b) =>
-          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-        )
-      })
-    },
-    [],
-  )
+  const hydrateSession = useCallback((session: SessionExercise[]) => {
+    setSessionExercises(session)
+    setCatalog((prev) => {
+      const byId = new Map(prev.map((e) => [e.id, e]))
+      for (const row of session) {
+        byId.set(row.exercise.id, row.exercise)
+      }
+      return [...byId.values()].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      )
+    })
+  }, [])
 
   const seedSessionWithExercises = useCallback((exercises: Exercise[]) => {
     if (exercises.length === 0) return
@@ -135,14 +153,9 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
 
   const addSetToExercise = useCallback(
     (exerciseId: string, weight: number, reps: number): AddSetResult => {
-      if (!Number.isFinite(weight) || weight < 0) {
-        return { ok: false, message: 'Indica un peso válido (≥ 0).' }
-      }
-      if (!Number.isInteger(reps) || reps < 1) {
-        return {
-          ok: false,
-          message: 'Las repeticiones deben ser un entero ≥ 1.',
-        }
+      const validation = validateSetValues(weight, reps)
+      if (!validation.ok) {
+        return validation
       }
 
       const newSet: LocalSessionSet = {
@@ -164,6 +177,40 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
     [],
   )
 
+  const updateSetInExercise = useCallback(
+    (
+      exerciseId: string,
+      localId: string,
+      weight: number,
+      reps: number,
+    ): AddSetResult => {
+      const validation = validateSetValues(weight, reps)
+      if (!validation.ok) {
+        return validation
+      }
+
+      setSessionExercises((prev) =>
+        updateSetInSession(prev, exerciseId, localId, weight, reps),
+      )
+
+      return { ok: true }
+    },
+    [],
+  )
+
+  const removeSetFromExercise = useCallback(
+    (exerciseId: string, localId: string) => {
+      setSessionExercises((prev) =>
+        removeSetFromSession(prev, exerciseId, localId),
+      )
+    },
+    [],
+  )
+
+  const removeExercise = useCallback((exerciseId: string) => {
+    setSessionExercises((prev) => removeExerciseFromSession(prev, exerciseId))
+  }, [])
+
   return {
     catalog,
     sessionExercises,
@@ -172,8 +219,11 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
     isAdding,
     addError,
     addExerciseByName,
-    hydrateSessionFromSets,
+    hydrateSession,
     seedSessionWithExercises,
     addSetToExercise,
+    updateSetInExercise,
+    removeSetFromExercise,
+    removeExerciseFromSession: removeExercise,
   }
 }

@@ -35,6 +35,59 @@
   color: var(--text-h);
 }
 
+.workout-page__draft {
+  margin-bottom: var(--section-space);
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+
+.workout-page__draft-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text-h);
+}
+
+.workout-page__draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.workout-page__draft-restore {
+  min-height: 40px;
+  padding: 0 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workout-page__draft-restore:hover {
+  filter: brightness(1.06);
+}
+
+.workout-page__draft-discard {
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.workout-page__draft-discard:hover {
+  color: var(--text-h);
+  border-color: var(--border-hover);
+}
+
 .workout-page__back {
   color: var(--nav-fg);
   text-decoration: none;

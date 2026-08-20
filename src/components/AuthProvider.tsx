@@ -50,6 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error
   }, [])
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await authService.sendPasswordResetEmail(
+      email,
+      `${window.location.origin}/reset-password`,
+    )
+    return error
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await authService.updatePassword(password)
+    return error
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -58,8 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      requestPasswordReset,
+      updatePassword,
     }),
-    [session, isLoading, signIn, signUp, signOut],
+    [
+      session,
+      isLoading,
+      signIn,
+      signUp,
+      signOut,
+      requestPasswordReset,
+      updatePassword,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -144,6 +144,30 @@
   cursor: not-allowed;
 }
 
+.login-form__hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.login-form__text-button {
+  margin-top: 0.9rem;
+  padding: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--nav-fg);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.login-form__text-button:hover {
+  color: var(--nav-fg-hover);
+  text-decoration: underline;
+}
+
 .login-page__footer {
   margin-top: 1.5rem;
   text-align: center;

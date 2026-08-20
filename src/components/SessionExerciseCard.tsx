@@ -1,7 +1,97 @@
-import { useId, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
-import type { SessionExercise } from '../types/workoutSession'
+import type { AddSetResult } from '../hooks/useWorkoutExercises'
+import { parseRepsInput, parseWeightInput } from '../lib/parseSetInputs'
+import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
 import './SessionExerciseCard.css'
+
+type SessionSetRowProps = {
+  index: number
+  set: LocalSessionSet
+  onUpdate: (weight: number, reps: number) => AddSetResult
+  onRemove: () => void
+}
+
+function SessionSetRow({ index, set, onUpdate, onRemove }: SessionSetRowProps) {
+  const [weightDraft, setWeightDraft] = useState(() => String(set.weight))
+  const [repsDraft, setRepsDraft] = useState(() => String(set.reps))
+  const [error, setError] = useState<string | null>(null)
+
+  // Al salir del campo se confirma el cambio. Si no es válido se restaura el
+  // valor anterior, para que lo que se ve sea siempre lo que se va a guardar.
+  function commit() {
+    const weight = parseWeightInput(weightDraft)
+    const reps = parseRepsInput(repsDraft)
+    const result: AddSetResult =
+      weight === null || reps === null
+        ? { ok: false, message: 'Peso y repeticiones deben ser números.' }
+        : onUpdate(weight, reps)
+
+    if (!result.ok) {
+      setWeightDraft(String(set.weight))
+      setRepsDraft(String(set.reps))
+      setError(result.message)
+      return
+    }
+
+    setWeightDraft(String(weight))
+    setRepsDraft(String(reps))
+    setError(null)
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.currentTarget.blur()
+    }
+  }
+
+  return (
+    <li className="session-exercise-card__set-item">
+      <div className="session-exercise-card__set-line">
+        <span className="session-exercise-card__set-n">{index + 1}</span>
+        <input
+          className="session-exercise-card__set-input"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          aria-label={`Peso de la serie ${index + 1}`}
+          aria-invalid={error !== null}
+          value={weightDraft}
+          onChange={(e) => setWeightDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+        />
+        <span className="session-exercise-card__set-unit">kg ×</span>
+        <input
+          className="session-exercise-card__set-input"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          aria-label={`Repeticiones de la serie ${index + 1}`}
+          aria-invalid={error !== null}
+          value={repsDraft}
+          onChange={(e) => setRepsDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          type="button"
+          className="session-exercise-card__set-remove"
+          onClick={onRemove}
+          aria-label={`Eliminar serie ${index + 1}`}
+        >
+          ×
+        </button>
+      </div>
+      {error ? (
+        <p className="session-exercise-card__set-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </li>
+  )
+}
 
 type SessionExerciseCardProps = {
   row: SessionExercise
@@ -11,10 +101,9 @@ type SessionExerciseCardProps = {
   onDraftWeightChange: (value: string) => void
   onDraftRepsChange: (value: string) => void
   onSubmitSet: (e: FormEvent<HTMLFormElement>) => void
-}
-
-function formatWeight(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(n)
+  onUpdateSet: (localId: string, weight: number, reps: number) => AddSetResult
+  onRemoveSet: (localId: string) => void
+  onRemoveExercise: () => void
 }
 
 export function SessionExerciseCard({
@@ -25,31 +114,56 @@ export function SessionExerciseCard({
   onDraftWeightChange,
   onDraftRepsChange,
   onSubmitSet,
+  onUpdateSet,
+  onRemoveSet,
+  onRemoveExercise,
 }: SessionExerciseCardProps) {
   const baseId = useId()
   const weightId = `${baseId}-weight`
   const repsId = `${baseId}-reps`
 
+  function handleRemoveExercise() {
+    if (row.sets.length > 0) {
+      const confirmed = window.confirm(
+        `«${row.exercise.name}» tiene ${row.sets.length} serie(s) en esta sesión. ¿Quitarlo del entreno?`,
+      )
+      if (!confirmed) {
+        return
+      }
+    }
+    onRemoveExercise()
+  }
+
   return (
     <li className="session-exercise-card">
-      <h3 className="session-exercise-card__title">
-        <Link
-          className="session-exercise-card__title-link"
-          to={`/exercises/${row.exercise.id}`}
+      <div className="session-exercise-card__header">
+        <h3 className="session-exercise-card__title">
+          <Link
+            className="session-exercise-card__title-link"
+            to={`/exercises/${row.exercise.id}`}
+          >
+            {row.exercise.name}
+          </Link>
+        </h3>
+        <button
+          type="button"
+          className="session-exercise-card__remove-exercise"
+          onClick={handleRemoveExercise}
         >
-          {row.exercise.name}
-        </Link>
-      </h3>
+          Quitar
+        </button>
+      </div>
 
       {row.sets.length > 0 ? (
         <ul className="session-exercise-card__sets" aria-label="Series registradas">
           {row.sets.map((s, index) => (
-            <li key={s.localId} className="session-exercise-card__set-line">
-              <span className="session-exercise-card__set-n">{index + 1}</span>
-              <span className="session-exercise-card__set-values">
-                {formatWeight(s.weight)} kg × {s.reps}
-              </span>
-            </li>
+            <SessionSetRow
+              key={s.localId}
+              index={index}
+              set={s}
+              onUpdate={(weight, reps) => onUpdateSet(s.localId, weight, reps)}
+              onRemove={() => onRemoveSet(s.localId)}
+            />
           ))}
         </ul>
       ) : null}
