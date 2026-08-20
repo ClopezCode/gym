@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Exercise } from '../types/exercise'
 import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
+import type { WorkoutSetWithExercise } from '../types/workoutSet'
 import { ensureExercise, listUserExercises } from '../services/exerciseService'
+import { sessionExercisesFromWorkoutSets } from '../lib/sessionFromWorkoutSets'
 
 function newLocalSetId(): string {
   return crypto.randomUUID()
@@ -19,6 +21,7 @@ export type UseWorkoutExercisesState = {
   isAdding: boolean
   addError: string | null
   addExerciseByName: (rawName: string) => Promise<void>
+  hydrateSessionFromSets: (sets: WorkoutSetWithExercise[]) => void
   seedSessionWithExercises: (exercises: Exercise[]) => void
   addSetToExercise: (
     exerciseId: string,
@@ -89,6 +92,27 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
     }
   }, [])
 
+  /**
+   * Reemplaza la sesión con las series ya persistidas del entreno. Debe correr
+   * antes de cualquier guardado: `replace_workout_sets` borra lo que no esté aquí.
+   */
+  const hydrateSessionFromSets = useCallback(
+    (sets: WorkoutSetWithExercise[]) => {
+      const hydrated = sessionExercisesFromWorkoutSets(sets)
+      setSessionExercises(hydrated)
+      setCatalog((prev) => {
+        const byId = new Map(prev.map((e) => [e.id, e]))
+        for (const row of hydrated) {
+          byId.set(row.exercise.id, row.exercise)
+        }
+        return [...byId.values()].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        )
+      })
+    },
+    [],
+  )
+
   const seedSessionWithExercises = useCallback((exercises: Exercise[]) => {
     if (exercises.length === 0) return
     setSessionExercises((prev) => {
@@ -148,6 +172,7 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
     isAdding,
     addError,
     addExerciseByName,
+    hydrateSessionFromSets,
     seedSessionWithExercises,
     addSetToExercise,
   }

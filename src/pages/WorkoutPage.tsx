@@ -4,6 +4,7 @@ import { SessionExerciseCard } from '../components/SessionExerciseCard'
 import { useWorkoutExercises } from '../hooks/useWorkoutExercises'
 import { parseRepsInput, parseWeightInput } from '../lib/parseSetInputs'
 import { getRoutineTemplateWithExercises } from '../services/routineTemplateService'
+import { getSetsForWorkout } from '../services/setService'
 import {
   getWorkoutById,
   saveCompleteWorkoutSession,
@@ -29,6 +30,8 @@ export function WorkoutPage() {
   const [isWorkoutLoading, setIsWorkoutLoading] = useState(() =>
     Boolean(workoutId),
   )
+  const [isSessionHydrated, setIsSessionHydrated] = useState(false)
+  const [savedSetCount, setSavedSetCount] = useState(0)
 
   const {
     catalog,
@@ -38,6 +41,7 @@ export function WorkoutPage() {
     isAdding,
     addError,
     addExerciseByName,
+    hydrateSessionFromSets,
     seedSessionWithExercises,
     addSetToExercise,
   } = useWorkoutExercises()
@@ -63,24 +67,39 @@ export function WorkoutPage() {
       setIsWorkoutLoading(true)
       setWorkoutLoadError(null)
       setWorkout(null)
+      setIsSessionHydrated(false)
+      setSavedSetCount(0)
 
       const result = await getWorkoutById(workoutId)
       if (cancelled) return
-      if (result.ok) {
-        setWorkout(result.workout)
-      } else {
+      if (!result.ok) {
         setWorkoutLoadError(result.message)
+        setIsWorkoutLoading(false)
+        return
       }
+
+      const setsResult = await getSetsForWorkout(workoutId)
+      if (cancelled) return
+      if (!setsResult.ok) {
+        setWorkoutLoadError(setsResult.message)
+        setIsWorkoutLoading(false)
+        return
+      }
+
+      hydrateSessionFromSets(setsResult.sets)
+      setSavedSetCount(setsResult.sets.length)
+      setIsSessionHydrated(true)
+      setWorkout(result.workout)
       setIsWorkoutLoading(false)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [workoutId])
+  }, [workoutId, hydrateSessionFromSets])
 
   useEffect(() => {
-    if (!workoutId || !templateIdFromNav || !workout) {
+    if (!workoutId || !templateIdFromNav || !workout || !isSessionHydrated) {
       return
     }
 
@@ -102,6 +121,7 @@ export function WorkoutPage() {
   }, [
     workoutId,
     workout,
+    isSessionHydrated,
     templateIdFromNav,
     seedSessionWithExercises,
     navigate,
@@ -158,6 +178,22 @@ export function WorkoutPage() {
   }
 
   async function handleSaveWorkout() {
+    const totalSets = sessionExercises.reduce(
+      (count, row) => count + row.sets.length,
+      0,
+    )
+
+    // Guardar reemplaza todas las series del entreno, así que una sesión vacía
+    // borra lo que hubiera antes.
+    if (totalSets === 0 && savedSetCount > 0) {
+      const confirmed = window.confirm(
+        `Este entreno tiene ${savedSetCount} serie(s) guardadas y la sesión está vacía. Si continúas se borrarán. ¿Guardar igualmente?`,
+      )
+      if (!confirmed) {
+        return
+      }
+    }
+
     setSaveError(null)
     setSaveSuccess(null)
     setIsSaving(true)
@@ -170,6 +206,7 @@ export function WorkoutPage() {
         setSaveError(result.message)
         return
       }
+      setSavedSetCount(result.setsSaved)
       setSaveSuccess(
         result.setsSaved === 0
           ? 'Guardado (sin series).'
@@ -324,7 +361,7 @@ export function WorkoutPage() {
             type="button"
             className="workout-page__save"
             onClick={handleSaveWorkout}
-            disabled={isSaving}
+            disabled={isSaving || !isSessionHydrated}
           >
             {isSaving ? 'Guardando…' : 'Guardar'}
           </button>

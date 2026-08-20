@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabaseClient'
+import type { Exercise } from '../types/exercise'
 import type { WorkoutSetWithExercise } from '../types/workoutSet'
 
-type ExerciseEmbed = { id: string; name: string }
+type ExerciseEmbed = Exercise
 
 type SetRowFromDb = {
   id: string
@@ -43,7 +44,7 @@ export async function getSetsForWorkout(
       weight,
       reps,
       created_at,
-      exercises ( id, name )
+      exercises ( id, name, user_id, created_at )
     `,
     )
     .eq('workout_id', workoutId)

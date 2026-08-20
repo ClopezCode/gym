@@ -10,5 +10,5 @@ export type WorkoutSetRow = {
 }
 
 export type WorkoutSetWithExercise = WorkoutSetRow & {
-  exercise: Pick<Exercise, 'id' | 'name'> | null
+  exercise: Exercise | null
 }
