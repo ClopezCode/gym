@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { elapsedMs, formatElapsed } from '../lib/formatDuration'
+import { formatSetDisplay } from '../lib/formatSetDisplay'
 import { formatWorkoutDate } from '../lib/formatWorkoutDate'
 import { groupSetsByExercise } from '../lib/groupSetsByExercise'
 import { getSetsForWorkout } from '../services/setService'
@@ -103,12 +105,19 @@ export function WorkoutHistoryDetailPage() {
           <h1 className="workout-history-detail__title">Detalle</h1>
           <p className="workout-history-detail__meta">
             {formatWorkoutDate(workout.date)}
+            {workout.started_at && workout.ended_at
+              ? ` · ${formatElapsed(elapsedMs(workout.started_at, workout.ended_at))}`
+              : ''}
           </p>
         </div>
         <Link className="workout-history-detail__back" to="/history">
           ← Historial
         </Link>
       </header>
+
+      {workout.notes ? (
+        <p className="workout-history-detail__notes">{workout.notes}</p>
+      ) : null}
 
       {groups.length === 0 ? (
         <p className="workout-history-detail__empty">Sin series en este entreno.</p>
@@ -138,7 +147,8 @@ export function WorkoutHistoryDetailPage() {
                       {index + 1}
                     </span>
                     <span className="workout-history-detail__set-values">
-                      {s.weight} kg × {s.reps}
+                      {formatSetDisplay(s.weight, s.reps, s.rpe)}
+                      {s.rest_seconds != null ? ` · ${s.rest_seconds} s` : ''}
                     </span>
                   </li>
                 ))}

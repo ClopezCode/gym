@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './components/AuthProvider'
 import { ExerciseDetailPage } from './pages/ExerciseDetailPage'
+import { CalendarPage } from './pages/CalendarPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { HomePage } from './pages/HomePage'
 import { ProgressPage } from './pages/ProgressPage'
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/routines" element={<RoutinesPage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route
               path="/history/:workoutId"
               element={<WorkoutHistoryDetailPage />}

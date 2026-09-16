@@ -1,6 +1,9 @@
+import type { MuscleGroup } from '../lib/muscleGroups'
+
 export type Exercise = {
   id: string
   name: string
   user_id: string | null
   created_at: string
+  muscle_group: MuscleGroup
 }

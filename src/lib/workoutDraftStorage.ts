@@ -5,23 +5,34 @@ const KEY_PREFIX = 'gym:workout-draft:'
 export type WorkoutDraft = {
   savedAt: string
   sessionExercises: SessionExercise[]
+  notes: string
 }
 
 /**
  * Huella del contenido de una sesión, ignorando los identificadores locales.
  * Sirve para saber si lo que hay en pantalla difiere de lo ya persistido.
  */
-export function sessionSignature(session: SessionExercise[]): string {
-  return session
+export function sessionSignature(session: SessionExercise[], notes = ''): string {
+  const setsPart = session
     .map(
       (row) =>
-        `${row.exercise.id}:${row.sets.map((s) => `${s.weight}x${s.reps}`).join(',')}`,
+        `${row.exercise.id}:${row.sets
+          .map(
+            (s) =>
+              `${s.weight}x${s.reps}@${s.rpe ?? ''}/${s.restSeconds ?? ''}`,
+          )
+          .join(',')}`,
     )
     .join('|')
+  return `${setsPart}#${notes}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isOptionalNumber(value: unknown): value is number | null | undefined {
+  return value === undefined || value === null || typeof value === 'number'
 }
 
 function isSessionExercise(value: unknown): value is SessionExercise {
@@ -39,8 +50,21 @@ function isSessionExercise(value: unknown): value is SessionExercise {
       isRecord(s) &&
       typeof s.localId === 'string' &&
       typeof s.weight === 'number' &&
-      typeof s.reps === 'number',
+      typeof s.reps === 'number' &&
+      isOptionalNumber(s.rpe) &&
+      isOptionalNumber(s.restSeconds),
   )
+}
+
+function normalizeSession(session: SessionExercise[]): SessionExercise[] {
+  return session.map((row) => ({
+    ...row,
+    sets: row.sets.map((s) => ({
+      ...s,
+      rpe: s.rpe ?? null,
+      restSeconds: s.restSeconds ?? null,
+    })),
+  }))
 }
 
 /**
@@ -62,9 +86,12 @@ export function parseDraft(raw: string | null): WorkoutDraft | null {
   if (!Array.isArray(parsed.sessionExercises)) return null
   if (!parsed.sessionExercises.every(isSessionExercise)) return null
 
+  const notes = typeof parsed.notes === 'string' ? parsed.notes : ''
+
   return {
     savedAt: parsed.savedAt,
-    sessionExercises: parsed.sessionExercises,
+    sessionExercises: normalizeSession(parsed.sessionExercises),
+    notes,
   }
 }
 
@@ -90,12 +117,14 @@ export function readWorkoutDraft(workoutId: string): WorkoutDraft | null {
 export function saveWorkoutDraft(
   workoutId: string,
   sessionExercises: SessionExercise[],
+  notes = '',
 ): void {
   const store = storage()
   if (!store) return
   const draft: WorkoutDraft = {
     savedAt: new Date().toISOString(),
     sessionExercises,
+    notes,
   }
   try {
     store.setItem(KEY_PREFIX + workoutId, JSON.stringify(draft))

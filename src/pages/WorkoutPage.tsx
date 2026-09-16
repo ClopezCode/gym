@@ -1,8 +1,15 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { RestTimer } from '../components/RestTimer'
 import { SessionExerciseCard } from '../components/SessionExerciseCard'
 import { useWorkoutExercises } from '../hooks/useWorkoutExercises'
-import { parseRepsInput, parseWeightInput } from '../lib/parseSetInputs'
+import { elapsedMs, formatElapsed } from '../lib/formatDuration'
+import {
+  MUSCLE_GROUPS,
+  muscleGroupLabel,
+  type MuscleGroup,
+} from '../lib/muscleGroups'
+import { parseRepsInput, parseRpeInput, parseWeightInput } from '../lib/parseSetInputs'
 import { sessionExercisesFromWorkoutSets } from '../lib/sessionFromWorkoutSets'
 import {
   clearWorkoutDraft,
@@ -20,9 +27,9 @@ import {
 import type { Workout } from '../types/workout'
 import './WorkoutPage.css'
 
-type SetDraft = { weight: string; reps: string }
+type SetDraft = { weight: string; reps: string; rpe: string }
 
-const emptyDraft = (): SetDraft => ({ weight: '', reps: '' })
+const emptyDraft = (): SetDraft => ({ weight: '', reps: '', rpe: '' })
 
 type LocationState = { templateId?: string }
 
@@ -55,6 +62,12 @@ export function WorkoutPage() {
   const [savedSetCount, setSavedSetCount] = useState(0)
   const [savedSignature, setSavedSignature] = useState('')
   const [pendingDraft, setPendingDraft] = useState<WorkoutDraft | null>(null)
+  const [notes, setNotes] = useState('')
+  const [newMuscleGroup, setNewMuscleGroup] = useState<MuscleGroup>('full_body')
+  const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | ''>('')
+  const [restTarget, setRestTarget] = useState(90)
+  const [restLeft, setRestLeft] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const {
     catalog,
@@ -81,6 +94,23 @@ export function WorkoutPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+
+  const filteredCatalog = muscleFilter
+    ? catalog.filter((ex) => ex.muscle_group === muscleFilter)
+    : catalog
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (restLeft === null || restLeft <= 0) return
+    const id = window.setTimeout(() => {
+      setRestLeft((n) => (n == null ? null : Math.max(0, n - 1)))
+    }, 1000)
+    return () => window.clearTimeout(id)
+  }, [restLeft])
 
   useEffect(() => {
     if (!workoutId) {
@@ -114,16 +144,16 @@ export function WorkoutPage() {
       }
 
       const fromDatabase = sessionExercisesFromWorkoutSets(setsResult.sets)
-      const databaseSignature = sessionSignature(fromDatabase)
+      const loadedNotes = result.workout.notes ?? ''
+      const databaseSignature = sessionSignature(fromDatabase, loadedNotes)
 
       hydrateSession(fromDatabase)
       setSavedSetCount(setsResult.sets.length)
       setSavedSignature(databaseSignature)
+      setNotes(loadedNotes)
 
-      // Un borrador que coincide con lo persistido no aporta nada: se descarta
-      // en silencio para no molestar con un aviso vacío.
       const draft = readWorkoutDraft(workoutId)
-      if (draft && sessionSignature(draft.sessionExercises) !== databaseSignature) {
+      if (draft && sessionSignature(draft.sessionExercises, draft.notes) !== databaseSignature) {
         setPendingDraft(draft)
       } else if (draft) {
         clearWorkoutDraft(workoutId)
@@ -169,31 +199,30 @@ export function WorkoutPage() {
     location.pathname,
   ])
 
-  // Copia local de lo que aún no está en Supabase, para sobrevivir a recargas,
-  // cierres del navegador y a que el móvil descarte la pestaña. No se escribe
-  // mientras hay un borrador pendiente de decisión, o lo sobrescribiría.
   useEffect(() => {
     if (!workoutId || !isSessionHydrated || pendingDraft) {
       return
     }
 
-    if (sessionSignature(sessionExercises) === savedSignature) {
+    if (sessionSignature(sessionExercises, notes) === savedSignature) {
       clearWorkoutDraft(workoutId)
       return
     }
 
-    saveWorkoutDraft(workoutId, sessionExercises)
+    saveWorkoutDraft(workoutId, sessionExercises, notes)
   }, [
     workoutId,
     isSessionHydrated,
     pendingDraft,
     sessionExercises,
+    notes,
     savedSignature,
   ])
 
   function restorePendingDraft() {
     if (!pendingDraft) return
     hydrateSession(pendingDraft.sessionExercises)
+    setNotes(pendingDraft.notes)
     setPendingDraft(null)
   }
 
@@ -206,12 +235,19 @@ export function WorkoutPage() {
 
   async function handleAddExercise(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    await addExerciseByName(exerciseName)
+    await addExerciseByName(exerciseName, newMuscleGroup)
     setExerciseName('')
   }
 
   function getDraft(exerciseId: string): SetDraft {
     return setDrafts[exerciseId] ?? emptyDraft()
+  }
+
+  function patchDraft(exerciseId: string, patch: Partial<SetDraft>) {
+    setSetDrafts((prev) => ({
+      ...prev,
+      [exerciseId]: { ...(prev[exerciseId] ?? emptyDraft()), ...patch },
+    }))
   }
 
   function handleSubmitSetForExercise(exerciseId: string) {
@@ -220,6 +256,7 @@ export function WorkoutPage() {
       const draft = getDraft(exerciseId)
       const w = parseWeightInput(draft.weight)
       const r = parseRepsInput(draft.reps)
+      const rpe = parseRpeInput(draft.rpe)
 
       if (w === null) {
         setAddSetErrors((prev) => ({
@@ -235,8 +272,20 @@ export function WorkoutPage() {
         }))
         return
       }
+      if (rpe === undefined) {
+        setAddSetErrors((prev) => ({
+          ...prev,
+          [exerciseId]: 'RPE entre 1 y 10, o vacío.',
+        }))
+        return
+      }
 
-      const result = addSetToExercise(exerciseId, w, r)
+      const result = addSetToExercise(exerciseId, {
+        weight: w,
+        reps: r,
+        rpe,
+        restSeconds: restTarget,
+      })
       if (!result.ok) {
         setAddSetErrors((prev) => ({
           ...prev,
@@ -248,8 +297,9 @@ export function WorkoutPage() {
       setAddSetErrors((prev) => ({ ...prev, [exerciseId]: null }))
       setSetDrafts((prev) => ({
         ...prev,
-        [exerciseId]: { weight: String(w), reps: '' },
+        [exerciseId]: { weight: String(w), reps: '', rpe: '' },
       }))
+      setRestLeft(restTarget)
     }
   }
 
@@ -259,8 +309,6 @@ export function WorkoutPage() {
       0,
     )
 
-    // Guardar reemplaza todas las series del entreno, así que una sesión vacía
-    // borra lo que hubiera antes.
     if (totalSets === 0 && savedSetCount > 0) {
       const confirmed = window.confirm(
         `Este entreno tiene ${savedSetCount} serie(s) guardadas y la sesión está vacía. Si continúas se borrarán. ¿Guardar igualmente?`,
@@ -277,17 +325,23 @@ export function WorkoutPage() {
       const result = await saveCompleteWorkoutSession({
         workoutId,
         sessionExercises,
+        notes,
       })
       if (!result.ok) {
         setSaveError(result.message)
         return
       }
       setSavedSetCount(result.setsSaved)
-      setSavedSignature(sessionSignature(sessionExercises))
+      setSavedSignature(sessionSignature(sessionExercises, notes))
       clearWorkoutDraft(result.workoutId)
       if (workoutId && workoutId !== result.workoutId) {
         clearWorkoutDraft(workoutId)
       }
+      setWorkout((prev) =>
+        prev
+          ? { ...prev, notes, ended_at: new Date().toISOString() }
+          : prev,
+      )
       setSaveSuccess(
         result.setsSaved === 0
           ? 'Guardado (sin series).'
@@ -337,6 +391,13 @@ export function WorkoutPage() {
     )
   }
 
+  const durationLabel = formatElapsed(
+    elapsedMs(
+      workout.started_at ?? workout.created_at,
+      new Date(nowMs).toISOString(),
+    ),
+  )
+
   return (
     <main className="workout-page">
       <header className="workout-page__header">
@@ -344,12 +405,25 @@ export function WorkoutPage() {
           <h1 className="workout-page__title">Entreno</h1>
           <p className="workout-page__meta">
             Fecha: <strong>{workout.date}</strong>
+            {' · '}
+            Duración: <strong>{durationLabel}</strong>
           </p>
         </div>
         <Link className="workout-page__back" to="/">
           ← Inicio
         </Link>
       </header>
+
+      {restLeft !== null ? (
+        <RestTimer
+          secondsLeft={restLeft}
+          totalSeconds={restTarget}
+          onSkip={() => setRestLeft(null)}
+          onAdjust={(delta) =>
+            setRestLeft((n) => Math.max(0, (n ?? 0) + delta))
+          }
+        />
+      ) : null}
 
       {pendingDraft ? (
         <div className="workout-page__draft" role="status">
@@ -386,6 +460,25 @@ export function WorkoutPage() {
         </h2>
 
         <form className="workout-page__form" onSubmit={handleAddExercise}>
+          <label className="workout-page__label" htmlFor="muscle-filter">
+            Filtrar catálogo
+          </label>
+          <select
+            id="muscle-filter"
+            className="workout-page__input"
+            value={muscleFilter}
+            onChange={(e) =>
+              setMuscleFilter((e.target.value || '') as MuscleGroup | '')
+            }
+          >
+            <option value="">Todos los grupos</option>
+            {MUSCLE_GROUPS.map((g) => (
+              <option key={g} value={g}>
+                {muscleGroupLabel(g)}
+              </option>
+            ))}
+          </select>
+
           <label className="workout-page__label" htmlFor="exercise-input">
             Ejercicio
           </label>
@@ -397,14 +490,14 @@ export function WorkoutPage() {
               type="text"
               list={listId}
               autoComplete="off"
-              placeholder="Ejercicio"
+              placeholder="Catálogo o nombre nuevo"
               value={exerciseName}
               onChange={(e) => setExerciseName(e.target.value)}
               disabled={isAdding || isCatalogLoading}
               aria-busy={isCatalogLoading}
             />
             <datalist id={listId}>
-              {catalog.map((ex) => (
+              {filteredCatalog.map((ex) => (
                 <option key={ex.id} value={ex.name} />
               ))}
             </datalist>
@@ -418,6 +511,35 @@ export function WorkoutPage() {
               {isAdding ? 'Añadiendo…' : 'Añadir'}
             </button>
           </div>
+          <label className="workout-page__label" htmlFor="new-muscle">
+            Grupo (si es nuevo)
+          </label>
+          <select
+            id="new-muscle"
+            className="workout-page__input"
+            value={newMuscleGroup}
+            onChange={(e) => setNewMuscleGroup(e.target.value as MuscleGroup)}
+          >
+            {MUSCLE_GROUPS.map((g) => (
+              <option key={g} value={g}>
+                {muscleGroupLabel(g)}
+              </option>
+            ))}
+          </select>
+          <label className="workout-page__label" htmlFor="rest-target">
+            Descanso al agregar serie
+          </label>
+          <select
+            id="rest-target"
+            className="workout-page__input"
+            value={restTarget}
+            onChange={(e) => setRestTarget(Number(e.target.value))}
+          >
+            <option value={60}>60 s</option>
+            <option value={90}>90 s</option>
+            <option value={120}>120 s</option>
+            <option value={180}>180 s</option>
+          </select>
           {catalogError ? (
             <p className="workout-page__error" role="alert">
               {catalogError}
@@ -443,22 +565,14 @@ export function WorkoutPage() {
                   row={row}
                   draftWeight={draft.weight}
                   draftReps={draft.reps}
+                  draftRpe={draft.rpe}
                   addSetError={addSetErrors[id] ?? null}
-                  onDraftWeightChange={(value) =>
-                    setSetDrafts((prev) => ({
-                      ...prev,
-                      [id]: { ...(prev[id] ?? emptyDraft()), weight: value },
-                    }))
-                  }
-                  onDraftRepsChange={(value) =>
-                    setSetDrafts((prev) => ({
-                      ...prev,
-                      [id]: { ...(prev[id] ?? emptyDraft()), reps: value },
-                    }))
-                  }
+                  onDraftWeightChange={(value) => patchDraft(id, { weight: value })}
+                  onDraftRepsChange={(value) => patchDraft(id, { reps: value })}
+                  onDraftRpeChange={(value) => patchDraft(id, { rpe: value })}
                   onSubmitSet={handleSubmitSetForExercise(id)}
-                  onUpdateSet={(localId, weight, reps) =>
-                    updateSetInExercise(id, localId, weight, reps)
+                  onUpdateSet={(localId, weight, reps, rpe) =>
+                    updateSetInExercise(id, localId, { weight, reps, rpe })
                   }
                   onRemoveSet={(localId) => removeSetFromExercise(id, localId)}
                   onRemoveExercise={() => removeExerciseFromSession(id)}
@@ -467,6 +581,20 @@ export function WorkoutPage() {
             })}
           </ul>
         )}
+
+        <div className="workout-page__notes">
+          <label className="workout-page__label" htmlFor="workout-notes">
+            Notas
+          </label>
+          <textarea
+            id="workout-notes"
+            className="workout-page__textarea"
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Cómo te sentiste, molestias, etc."
+          />
+        </div>
 
         <div className="workout-page__save-bar">
           <button

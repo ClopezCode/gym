@@ -203,10 +203,27 @@
   list-style: none;
 }
 
-.workout-page__save-bar {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+.workout-page__notes {
+  margin-top: 1.5rem;
+}
+
+.workout-page__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.workout-page__textarea:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 0;
 }
 
 .workout-page__save {

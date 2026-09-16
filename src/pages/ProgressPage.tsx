@@ -119,7 +119,7 @@ export function ProgressPage() {
         <div>
           <h1 className="progress-page__title">Progreso</h1>
           <p className="progress-page__subtitle">
-            Volumen semanal y por ejercicio
+            Volumen semanal, por ejercicio y 1RM estimado en la ficha.
           </p>
         </div>
         <Link className="progress-page__back" to="/">

@@ -1,0 +1,77 @@
+.rest-timer {
+  margin-bottom: var(--section-space);
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+}
+
+.rest-timer--done {
+  border-color: var(--accent);
+}
+
+.rest-timer__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rest-timer__label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.rest-timer__clock {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+}
+
+.rest-timer__bar {
+  margin: 0.55rem 0 0.7rem;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  overflow: hidden;
+}
+
+.rest-timer__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s linear;
+}
+
+.rest-timer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.rest-timer__btn,
+.rest-timer__skip {
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rest-timer__btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.rest-timer__skip {
+  margin-left: auto;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-fg);
+}

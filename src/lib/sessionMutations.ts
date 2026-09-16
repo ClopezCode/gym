@@ -7,6 +7,7 @@ export function updateSetInSession(
   localId: string,
   weight: number,
   reps: number,
+  extras?: { rpe?: number | null; restSeconds?: number | null },
 ): SessionExercise[] {
   return session.map((row) =>
     row.exercise.id !== exerciseId
@@ -14,7 +15,9 @@ export function updateSetInSession(
       : {
           ...row,
           sets: row.sets.map((s) =>
-            s.localId === localId ? { ...s, weight, reps } : s,
+            s.localId === localId
+              ? { ...s, weight, reps, ...extras }
+              : s,
           ),
         },
   )

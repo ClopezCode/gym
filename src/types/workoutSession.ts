@@ -5,6 +5,8 @@ export type LocalSessionSet = {
   localId: string
   weight: number
   reps: number
+  rpe: number | null
+  restSeconds: number | null
 }
 
 export type SessionExercise = {

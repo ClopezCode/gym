@@ -105,6 +105,9 @@ export function HomePage() {
           <Link className="home-page__history-link" to="/history">
             Historial
           </Link>
+          <Link className="home-page__history-link" to="/calendar">
+            Calendario
+          </Link>
         </div>
       </header>
 

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Exercise } from '../types/exercise'
-import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
-import { ensureExercise, listUserExercises } from '../services/exerciseService'
+import type { MuscleGroup } from '../lib/muscleGroups'
 import {
   removeExerciseFromSession,
   removeSetFromSession,
   updateSetInSession,
 } from '../lib/sessionMutations'
+import { ensureExercise, listUserExercises } from '../services/exerciseService'
+import type { Exercise } from '../types/exercise'
+import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
 
 function newLocalSetId(): string {
   return crypto.randomUUID()
@@ -26,6 +27,13 @@ function validateSetValues(weight: number, reps: number): AddSetResult {
   return { ok: true }
 }
 
+export type AddSetInput = {
+  weight: number
+  reps: number
+  rpe?: number | null
+  restSeconds?: number | null
+}
+
 export type UseWorkoutExercisesState = {
   catalog: Exercise[]
   sessionExercises: SessionExercise[]
@@ -33,26 +41,21 @@ export type UseWorkoutExercisesState = {
   catalogError: string | null
   isAdding: boolean
   addError: string | null
-  addExerciseByName: (rawName: string) => Promise<void>
+  addExerciseByName: (rawName: string, muscleGroup?: MuscleGroup) => Promise<void>
   hydrateSession: (session: SessionExercise[]) => void
   seedSessionWithExercises: (exercises: Exercise[]) => void
-  addSetToExercise: (
-    exerciseId: string,
-    weight: number,
-    reps: number,
-  ) => AddSetResult
+  addSetToExercise: (exerciseId: string, input: AddSetInput) => AddSetResult
   updateSetInExercise: (
     exerciseId: string,
     localId: string,
-    weight: number,
-    reps: number,
+    input: AddSetInput,
   ) => AddSetResult
   removeSetFromExercise: (exerciseId: string, localId: string) => void
   removeExerciseFromSession: (exerciseId: string) => void
 }
 
 /**
- * Catálogo del usuario (Supabase) + ejercicios y sets del workout actual (solo estado local).
+ * Catálogo (global + usuario) + ejercicios y sets del workout actual (estado local).
  */
 export function useWorkoutExercises(): UseWorkoutExercisesState {
   const [catalog, setCatalog] = useState<Exercise[]>([])
@@ -82,36 +85,39 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
     }
   }, [])
 
-  const addExerciseByName = useCallback(async (rawName: string) => {
-    setAddError(null)
-    setIsAdding(true)
-    try {
-      const result = await ensureExercise(rawName)
-      if (!result.ok) {
-        setAddError(result.message)
-        return
-      }
-
-      const { exercise } = result
-
-      setSessionExercises((prev) =>
-        prev.some((row) => row.exercise.id === exercise.id)
-          ? prev
-          : [...prev, { exercise, sets: [] }],
-      )
-
-      setCatalog((prev) => {
-        if (prev.some((e) => e.id === exercise.id)) {
-          return prev
+  const addExerciseByName = useCallback(
+    async (rawName: string, muscleGroup: MuscleGroup = 'full_body') => {
+      setAddError(null)
+      setIsAdding(true)
+      try {
+        const result = await ensureExercise(rawName, muscleGroup)
+        if (!result.ok) {
+          setAddError(result.message)
+          return
         }
-        return [...prev, exercise].sort((a, b) =>
-          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+
+        const { exercise } = result
+
+        setSessionExercises((prev) =>
+          prev.some((row) => row.exercise.id === exercise.id)
+            ? prev
+            : [...prev, { exercise, sets: [] }],
         )
-      })
-    } finally {
-      setIsAdding(false)
-    }
-  }, [])
+
+        setCatalog((prev) => {
+          if (prev.some((e) => e.id === exercise.id)) {
+            return prev
+          }
+          return [...prev, exercise].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+          )
+        })
+      } finally {
+        setIsAdding(false)
+      }
+    },
+    [],
+  )
 
   /**
    * Reemplaza por completo la sesión, ya venga de la base de datos o de un
@@ -152,16 +158,18 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
   }, [])
 
   const addSetToExercise = useCallback(
-    (exerciseId: string, weight: number, reps: number): AddSetResult => {
-      const validation = validateSetValues(weight, reps)
+    (exerciseId: string, input: AddSetInput): AddSetResult => {
+      const validation = validateSetValues(input.weight, input.reps)
       if (!validation.ok) {
         return validation
       }
 
       const newSet: LocalSessionSet = {
         localId: newLocalSetId(),
-        weight,
-        reps,
+        weight: input.weight,
+        reps: input.reps,
+        rpe: input.rpe ?? null,
+        restSeconds: input.restSeconds ?? null,
       }
 
       setSessionExercises((prev) =>
@@ -178,19 +186,17 @@ export function useWorkoutExercises(): UseWorkoutExercisesState {
   )
 
   const updateSetInExercise = useCallback(
-    (
-      exerciseId: string,
-      localId: string,
-      weight: number,
-      reps: number,
-    ): AddSetResult => {
-      const validation = validateSetValues(weight, reps)
+    (exerciseId: string, localId: string, input: AddSetInput): AddSetResult => {
+      const validation = validateSetValues(input.weight, input.reps)
       if (!validation.ok) {
         return validation
       }
 
       setSessionExercises((prev) =>
-        updateSetInSession(prev, exerciseId, localId, weight, reps),
+        updateSetInSession(prev, exerciseId, localId, input.weight, input.reps, {
+          rpe: input.rpe ?? null,
+          restSeconds: input.restSeconds,
+        }),
       )
 
       return { ok: true }

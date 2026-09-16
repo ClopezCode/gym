@@ -2,12 +2,28 @@ import { supabase } from '../lib/supabaseClient'
 import type { SessionExercise } from '../types/workoutSession'
 import type { Workout } from '../types/workout'
 
+export const WORKOUT_COLUMNS =
+  'id, user_id, date, created_at, notes, started_at, ended_at'
+
 function todayLocalISODate(): string {
   const n = new Date()
   const y = n.getFullYear()
   const m = String(n.getMonth() + 1).padStart(2, '0')
   const d = String(n.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function isISODate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function asWorkout(row: Workout): Workout {
+  return {
+    ...row,
+    notes: row.notes ?? '',
+    started_at: row.started_at ?? null,
+    ended_at: row.ended_at ?? null,
+  }
 }
 
 export type CreateWorkoutSuccess = { ok: true; workout: Workout }
@@ -17,9 +33,10 @@ export type CreateWorkoutFailure = { ok: false; message: string }
 export type CreateWorkoutResult = CreateWorkoutSuccess | CreateWorkoutFailure
 
 /**
- * Inserta un workout para el usuario autenticado con la fecha local actual.
+ * Inserta un workout para el usuario autenticado.
+ * `date` opcional (YYYY-MM-DD); por defecto hoy local.
  */
-export async function createWorkout(): Promise<CreateWorkoutResult> {
+export async function createWorkout(date?: string): Promise<CreateWorkoutResult> {
   const {
     data: { user },
     error: authError,
@@ -32,20 +49,24 @@ export async function createWorkout(): Promise<CreateWorkoutResult> {
     return { ok: false, message: 'No hay sesión activa.' }
   }
 
+  const workoutDate = date && isISODate(date) ? date : todayLocalISODate()
+
   const { data, error } = await supabase
     .from('workouts')
     .insert({
       user_id: user.id,
-      date: todayLocalISODate(),
+      date: workoutDate,
+      notes: '',
+      started_at: new Date().toISOString(),
     })
-    .select('id, user_id, date, created_at')
+    .select(WORKOUT_COLUMNS)
     .single()
 
   if (error) {
     return { ok: false, message: error.message }
   }
 
-  return { ok: true, workout: data as Workout }
+  return { ok: true, workout: asWorkout(data as Workout) }
 }
 
 export type GetWorkoutSuccess = { ok: true; workout: Workout }
@@ -80,7 +101,7 @@ export async function getWorkoutById(workoutId: string): Promise<GetWorkoutResul
 
   const { data, error } = await supabase
     .from('workouts')
-    .select('id, user_id, date, created_at')
+    .select(WORKOUT_COLUMNS)
     .eq('id', workoutId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -96,7 +117,7 @@ export async function getWorkoutById(workoutId: string): Promise<GetWorkoutResul
     }
   }
 
-  return { ok: true, workout: data as Workout }
+  return { ok: true, workout: asWorkout(data as Workout) }
 }
 
 export type ListWorkoutsSuccess = { ok: true; workouts: Workout[] }
@@ -121,7 +142,7 @@ export async function listUserWorkouts(): Promise<ListWorkoutsResult> {
 
   const { data, error } = await supabase
     .from('workouts')
-    .select('id, user_id, date, created_at')
+    .select(WORKOUT_COLUMNS)
     .eq('user_id', user.id)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -130,7 +151,7 @@ export async function listUserWorkouts(): Promise<ListWorkoutsResult> {
     return { ok: false, message: error.message }
   }
 
-  return { ok: true, workouts: (data ?? []) as Workout[] }
+  return { ok: true, workouts: ((data ?? []) as Workout[]).map(asWorkout) }
 }
 
 /** Payload para la RPC `replace_workout_sets` (sin workout_id por fila). */
@@ -138,6 +159,8 @@ type ReplaceWorkoutSetItem = {
   exercise_id: string
   weight: number
   reps: number
+  rpe: number | null
+  rest_seconds: number | null
 }
 
 function buildReplaceWorkoutSetsPayload(
@@ -150,6 +173,8 @@ function buildReplaceWorkoutSetsPayload(
         exercise_id: row.exercise.id,
         weight: s.weight,
         reps: s.reps,
+        rpe: s.rpe,
+        rest_seconds: s.restSeconds,
       })
     }
   }
@@ -200,6 +225,7 @@ export type SaveCompleteWorkoutResult =
 export async function saveCompleteWorkoutSession(params: {
   workoutId: string | null | undefined
   sessionExercises: SessionExercise[]
+  notes?: string
 }): Promise<SaveCompleteWorkoutResult> {
   const resolved = await resolveWorkoutIdForSave(params.workoutId)
   if (!resolved.ok) {
@@ -216,6 +242,19 @@ export async function saveCompleteWorkoutSession(params: {
 
   if (error) {
     return { ok: false, message: error.message }
+  }
+
+  const notes = params.notes?.trim() ?? ''
+  const { error: metaError } = await supabase
+    .from('workouts')
+    .update({
+      notes,
+      ended_at: new Date().toISOString(),
+    })
+    .eq('id', targetWorkoutId)
+
+  if (metaError) {
+    return { ok: false, message: metaError.message }
   }
 
   const setsSaved = typeof data === 'number' ? data : Number(data)

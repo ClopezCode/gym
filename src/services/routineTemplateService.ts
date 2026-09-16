@@ -59,7 +59,7 @@ export async function getRoutineTemplateWithExercises(
     .select(
       `
       sort_order,
-      exercises ( id, name, user_id, created_at )
+      exercises ( id, name, user_id, created_at, muscle_group )
     `,
     )
     .eq('template_id', templateId)

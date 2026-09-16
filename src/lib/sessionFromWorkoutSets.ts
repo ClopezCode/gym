@@ -25,6 +25,8 @@ export function sessionExercisesFromWorkoutSets(
       localId: crypto.randomUUID(),
       weight: row.weight,
       reps: row.reps,
+      rpe: row.rpe,
+      restSeconds: row.rest_seconds,
     })
   }
 

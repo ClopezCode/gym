@@ -140,7 +140,8 @@ export function RoutinesPage() {
         <div>
           <h1 className="routines-page__title">Plantillas</h1>
           <p className="routines-page__subtitle">
-            Listas reutilizables; al entrenar se cargan sin series.
+            Listas reutilizables; al entrenar se cargan sin series. El catálogo
+            incluye ejercicios globales.
           </p>
         </div>
         <Link className="routines-page__back" to="/">
@@ -182,7 +183,7 @@ export function RoutinesPage() {
               list={listId}
               value={pickerValue}
               onChange={(e) => setPickerValue(e.target.value)}
-              placeholder="Buscar en tu catálogo"
+              placeholder="Buscar en el catálogo"
               disabled={isCreating}
             />
             <datalist id={listId}>

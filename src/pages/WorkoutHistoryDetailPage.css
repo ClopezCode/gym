@@ -51,9 +51,14 @@
   margin: 0 0 1rem;
 }
 
-.workout-history-detail__empty {
-  color: var(--text);
-  margin: 0;
+.workout-history-detail__notes {
+  margin: 0 0 var(--section-space);
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--text-h);
+  white-space: pre-wrap;
 }
 
 .workout-history-detail__exercise-list {

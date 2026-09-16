@@ -8,7 +8,13 @@ import type { Exercise } from '../types/exercise'
 import type { SessionExercise } from '../types/workoutSession'
 
 function exercise(id: string, name: string): Exercise {
-  return { id, name, user_id: 'user-1', created_at: '2026-01-01T00:00:00Z' }
+  return {
+    id,
+    name,
+    user_id: 'user-1',
+    created_at: '2026-01-01T00:00:00Z',
+    muscle_group: 'pecho',
+  }
 }
 
 const press = exercise('ex-1', 'Press banca')
@@ -21,13 +27,13 @@ beforeEach(() => {
     {
       exercise: press,
       sets: [
-        { localId: 'a', weight: 60, reps: 10 },
-        { localId: 'b', weight: 62.5, reps: 8 },
+        { localId: 'a', weight: 60, reps: 10, rpe: null, restSeconds: null },
+        { localId: 'b', weight: 62.5, reps: 8, rpe: null, restSeconds: null },
       ],
     },
     {
       exercise: sentadilla,
-      sets: [{ localId: 'c', weight: 100, reps: 5 }],
+      sets: [{ localId: 'c', weight: 100, reps: 5, rpe: null, restSeconds: null }],
     },
   ]
 })
@@ -36,20 +42,40 @@ describe('updateSetInSession', () => {
   it('cambia el peso y las repeticiones de la serie indicada', () => {
     const result = updateSetInSession(session, 'ex-1', 'b', 65, 6)
 
-    expect(result[0].sets[1]).toEqual({ localId: 'b', weight: 65, reps: 6 })
+    expect(result[0].sets[1]).toEqual({
+      localId: 'b',
+      weight: 65,
+      reps: 6,
+      rpe: null,
+      restSeconds: null,
+    })
   })
 
   it('no toca las demás series ni los demás ejercicios', () => {
     const result = updateSetInSession(session, 'ex-1', 'b', 65, 6)
 
-    expect(result[0].sets[0]).toEqual({ localId: 'a', weight: 60, reps: 10 })
-    expect(result[1].sets).toEqual([{ localId: 'c', weight: 100, reps: 5 }])
+    expect(result[0].sets[0]).toEqual({
+      localId: 'a',
+      weight: 60,
+      reps: 10,
+      rpe: null,
+      restSeconds: null,
+    })
+    expect(result[1].sets).toEqual([
+      { localId: 'c', weight: 100, reps: 5, rpe: null, restSeconds: null },
+    ])
   })
 
   it('no modifica la sesión original', () => {
     updateSetInSession(session, 'ex-1', 'b', 65, 6)
 
-    expect(session[0].sets[1]).toEqual({ localId: 'b', weight: 62.5, reps: 8 })
+    expect(session[0].sets[1]).toEqual({
+      localId: 'b',
+      weight: 62.5,
+      reps: 8,
+      rpe: null,
+      restSeconds: null,
+    })
   })
 
   it('devuelve la sesión intacta si la serie no existe', () => {
@@ -63,7 +89,9 @@ describe('removeSetFromSession', () => {
   it('elimina solo la serie indicada', () => {
     const result = removeSetFromSession(session, 'ex-1', 'a')
 
-    expect(result[0].sets).toEqual([{ localId: 'b', weight: 62.5, reps: 8 }])
+    expect(result[0].sets).toEqual([
+      { localId: 'b', weight: 62.5, reps: 8, rpe: null, restSeconds: null },
+    ])
   })
 
   it('conserva el ejercicio aunque se quede sin series', () => {

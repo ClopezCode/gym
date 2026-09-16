@@ -4,7 +4,13 @@ import type { Exercise } from '../types/exercise'
 import type { WorkoutSetWithExercise } from '../types/workoutSet'
 
 function exercise(id: string, name: string): Exercise {
-  return { id, name, user_id: 'user-1', created_at: '2026-01-01T00:00:00Z' }
+  return {
+    id,
+    name,
+    user_id: 'user-1',
+    created_at: '2026-01-01T00:00:00Z',
+    muscle_group: 'pecho',
+  }
 }
 
 function set(
@@ -19,6 +25,8 @@ function set(
     exercise_id: ex?.id ?? null,
     weight,
     reps,
+    rpe: null,
+    rest_seconds: null,
     created_at: `2026-01-01T00:00:0${id}Z`,
     exercise: ex,
   }

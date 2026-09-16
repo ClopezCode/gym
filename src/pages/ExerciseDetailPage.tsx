@@ -10,8 +10,13 @@ import {
   YAxis,
 } from 'recharts'
 import type { ExerciseSessionVolumePoint } from '../lib/statsAggregates'
+import { muscleGroupLabel } from '../lib/muscleGroups'
 import { formatSetDisplay } from '../lib/formatSetDisplay'
 import { formatWorkoutDate } from '../lib/formatWorkoutDate'
+import {
+  bestEstimatedOneRepMax,
+  formatEstimated1RM,
+} from '../lib/estimatedOneRepMax'
 import { getExercisePerformanceDetail } from '../services/exerciseService'
 import { getExerciseVolumeBySession } from '../services/statsService'
 import type { Exercise } from '../types/exercise'
@@ -123,7 +128,12 @@ export function ExerciseDetailPage() {
       <header className="exercise-detail__header">
         <div>
           <h1 className="exercise-detail__title">{exercise.name}</h1>
-          <p className="exercise-detail__subtitle">Series</p>
+          <p className="exercise-detail__subtitle">
+            {muscleGroupLabel(exercise.muscle_group)}
+            {history.length > 0
+              ? ` · 1RM est. ${formatEstimated1RM(bestEstimatedOneRepMax(history))}`
+              : ''}
+          </p>
         </div>
         <div className="exercise-detail__header-links">
           <Link className="exercise-detail__back" to="/progress">
@@ -144,7 +154,7 @@ export function ExerciseDetailPage() {
             Última vez
           </h2>
           <p className="exercise-detail__last-value">
-            {formatSetDisplay(lastEntry.weight, lastEntry.reps)}
+            {formatSetDisplay(lastEntry.weight, lastEntry.reps, lastEntry.rpe)}
           </p>
           <p className="exercise-detail__last-meta">
             {formatWorkoutDate(lastEntry.workout_date)}
@@ -176,7 +186,7 @@ export function ExerciseDetailPage() {
                 </span>
                 <div className="exercise-detail__history-main">
                   <span className="exercise-detail__history-set">
-                    {formatSetDisplay(entry.weight, entry.reps)}
+                    {formatSetDisplay(entry.weight, entry.reps, entry.rpe)}
                   </span>
                   <span className="exercise-detail__history-date">
                     {formatWorkoutDate(entry.workout_date)}

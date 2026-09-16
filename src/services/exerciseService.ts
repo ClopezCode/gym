@@ -1,6 +1,12 @@
 import { supabase } from '../lib/supabaseClient'
+import {
+  isMuscleGroup,
+  type MuscleGroup,
+} from '../lib/muscleGroups'
 import type { Exercise } from '../types/exercise'
 import type { ExerciseSetHistoryEntry } from '../types/exercisePerformance'
+
+export const EXERCISE_COLUMNS = 'id, name, user_id, created_at, muscle_group'
 
 export type ListExercisesSuccess = { ok: true; exercises: Exercise[] }
 export type ListExercisesFailure = { ok: false; message: string }
@@ -12,6 +18,13 @@ export type EnsureExerciseResult = EnsureExerciseSuccess | EnsureExerciseFailure
 
 function normalizeForCompare(name: string): string {
   return name.trim().toLowerCase()
+}
+
+function asExercise(row: Exercise): Exercise {
+  return {
+    ...row,
+    muscle_group: isMuscleGroup(row.muscle_group) ? row.muscle_group : 'full_body',
+  }
 }
 
 async function getAuthenticatedUserId(): Promise<
@@ -33,7 +46,7 @@ async function getAuthenticatedUserId(): Promise<
 }
 
 /**
- * Lista ejercicios cuyo `user_id` coincide con el usuario autenticado.
+ * Catálogo global (`user_id` null) + ejercicios propios.
  */
 export async function listUserExercises(): Promise<ListExercisesResult> {
   const auth = await getAuthenticatedUserId()
@@ -43,21 +56,24 @@ export async function listUserExercises(): Promise<ListExercisesResult> {
 
   const { data, error } = await supabase
     .from('exercises')
-    .select('id, name, user_id, created_at')
-    .eq('user_id', auth.userId)
+    .select(EXERCISE_COLUMNS)
+    .or(`user_id.eq.${auth.userId},user_id.is.null`)
     .order('name', { ascending: true })
 
   if (error) {
     return { ok: false, message: error.message }
   }
 
-  return { ok: true, exercises: (data ?? []) as Exercise[] }
+  return { ok: true, exercises: ((data ?? []) as Exercise[]).map(asExercise) }
 }
 
 /**
  * Inserta un ejercicio nuevo para el usuario autenticado (`name` recortado).
  */
-export async function createExercise(name: string): Promise<EnsureExerciseResult> {
+export async function createExercise(
+  name: string,
+  muscleGroup: MuscleGroup = 'full_body',
+): Promise<EnsureExerciseResult> {
   const trimmed = name.trim()
   if (!trimmed) {
     return { ok: false, message: 'El nombre del ejercicio no puede estar vacío.' }
@@ -73,50 +89,51 @@ export async function createExercise(name: string): Promise<EnsureExerciseResult
     .insert({
       user_id: auth.userId,
       name: trimmed,
+      muscle_group: muscleGroup,
     })
-    .select('id, name, user_id, created_at')
+    .select(EXERCISE_COLUMNS)
     .single()
 
   if (error) {
     return { ok: false, message: error.message }
   }
 
-  return { ok: true, exercise: data as Exercise }
+  return { ok: true, exercise: asExercise(data as Exercise) }
 }
 
 /**
- * Devuelve un ejercicio existente del usuario (comparación sin distinguir mayúsculas)
+ * Devuelve un ejercicio del catálogo o del usuario (sin distinguir mayúsculas)
  * o crea uno nuevo si no hay coincidencia.
  */
-export async function ensureExercise(name: string): Promise<EnsureExerciseResult> {
+export async function ensureExercise(
+  name: string,
+  muscleGroup: MuscleGroup = 'full_body',
+): Promise<EnsureExerciseResult> {
   const trimmed = name.trim()
   if (!trimmed) {
     return { ok: false, message: 'El nombre del ejercicio no puede estar vacío.' }
   }
 
-  const auth = await getAuthenticatedUserId()
-  if (!auth.ok) {
-    return { ok: false, message: auth.message }
+  const listed = await listUserExercises()
+  if (!listed.ok) {
+    return { ok: false, message: listed.message }
   }
 
   const target = normalizeForCompare(trimmed)
-
-  const { data: rows, error } = await supabase
-    .from('exercises')
-    .select('id, name, user_id, created_at')
-    .eq('user_id', auth.userId)
-
-  if (error) {
-    return { ok: false, message: error.message }
+  const own = listed.exercises.find(
+    (e) => e.user_id !== null && normalizeForCompare(e.name) === target,
+  )
+  if (own) {
+    return { ok: true, exercise: own }
+  }
+  const global = listed.exercises.find(
+    (e) => e.user_id === null && normalizeForCompare(e.name) === target,
+  )
+  if (global) {
+    return { ok: true, exercise: global }
   }
 
-  const list = (rows ?? []) as Exercise[]
-  const existing = list.find((e) => normalizeForCompare(e.name) === target)
-  if (existing) {
-    return { ok: true, exercise: existing }
-  }
-
-  return createExercise(trimmed)
+  return createExercise(trimmed, muscleGroup)
 }
 
 type WorkoutEmbed = { id: string; date: string; user_id: string }
@@ -125,6 +142,7 @@ type SetHistoryRowDb = {
   id: string
   weight: number
   reps: number
+  rpe: number | null
   created_at: string
   workout_id: string | null
   workouts: WorkoutEmbed | WorkoutEmbed[] | null
@@ -153,9 +171,7 @@ export type GetExercisePerformanceDetailResult =
   | GetExercisePerformanceDetailFailure
 
 /**
- * Ejercicio del usuario + todas sus series en entrenamientos propios,
- * en una sola query de series (join `workouts!inner` filtrado por `user_id`)
- * más una lectura puntual del ejercicio para validar titularidad.
+ * Ejercicio usable (propio o catálogo) + series en entrenos del usuario.
  */
 export async function getExercisePerformanceDetail(
   exerciseId: string,
@@ -168,9 +184,9 @@ export async function getExercisePerformanceDetail(
   const [exerciseRes, setsRes] = await Promise.all([
     supabase
       .from('exercises')
-      .select('id, name, user_id, created_at')
+      .select(EXERCISE_COLUMNS)
       .eq('id', exerciseId)
-      .eq('user_id', auth.userId)
+      .or(`user_id.eq.${auth.userId},user_id.is.null`)
       .maybeSingle(),
     supabase
       .from('sets')
@@ -179,6 +195,7 @@ export async function getExercisePerformanceDetail(
       id,
       weight,
       reps,
+      rpe,
       created_at,
       workout_id,
       workouts!inner ( id, date, user_id )
@@ -200,7 +217,7 @@ export async function getExercisePerformanceDetail(
     return { ok: false, message: setsRes.error.message }
   }
 
-  const exerciseRow = exerciseRes.data
+  const exerciseRow = asExercise(exerciseRes.data as Exercise)
   const setRows = setsRes.data
 
   const rawRows = (setRows ?? []) as SetHistoryRowDb[]
@@ -213,6 +230,7 @@ export async function getExercisePerformanceDetail(
       id: row.id,
       weight: Number(row.weight),
       reps: row.reps,
+      rpe: row.rpe == null ? null : Number(row.rpe),
       created_at: row.created_at,
       workout_id: row.workout_id ?? w.id,
       workout_date: w.date,
@@ -221,8 +239,7 @@ export async function getExercisePerformanceDetail(
 
   return {
     ok: true,
-    exercise: exerciseRow as Exercise,
+    exercise: exerciseRow,
     history,
   }
 }
-

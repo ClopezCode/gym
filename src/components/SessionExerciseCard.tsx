@@ -1,41 +1,46 @@
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { AddSetResult } from '../hooks/useWorkoutExercises'
-import { parseRepsInput, parseWeightInput } from '../lib/parseSetInputs'
+import { muscleGroupLabel } from '../lib/muscleGroups'
+import { parseRepsInput, parseRpeInput, parseWeightInput } from '../lib/parseSetInputs'
 import type { LocalSessionSet, SessionExercise } from '../types/workoutSession'
 import './SessionExerciseCard.css'
 
 type SessionSetRowProps = {
   index: number
   set: LocalSessionSet
-  onUpdate: (weight: number, reps: number) => AddSetResult
+  onUpdate: (weight: number, reps: number, rpe: number | null) => AddSetResult
   onRemove: () => void
 }
 
 function SessionSetRow({ index, set, onUpdate, onRemove }: SessionSetRowProps) {
   const [weightDraft, setWeightDraft] = useState(() => String(set.weight))
   const [repsDraft, setRepsDraft] = useState(() => String(set.reps))
+  const [rpeDraft, setRpeDraft] = useState(() => (set.rpe == null ? '' : String(set.rpe)))
   const [error, setError] = useState<string | null>(null)
 
-  // Al salir del campo se confirma el cambio. Si no es válido se restaura el
-  // valor anterior, para que lo que se ve sea siempre lo que se va a guardar.
   function commit() {
     const weight = parseWeightInput(weightDraft)
     const reps = parseRepsInput(repsDraft)
+    const rpe = parseRpeInput(rpeDraft)
     const result: AddSetResult =
       weight === null || reps === null
         ? { ok: false, message: 'Peso y repeticiones deben ser números.' }
-        : onUpdate(weight, reps)
+        : rpe === undefined
+          ? { ok: false, message: 'RPE entre 1 y 10, o vacío.' }
+          : onUpdate(weight, reps, rpe)
 
     if (!result.ok) {
       setWeightDraft(String(set.weight))
       setRepsDraft(String(set.reps))
+      setRpeDraft(set.rpe == null ? '' : String(set.rpe))
       setError(result.message)
       return
     }
 
     setWeightDraft(String(weight))
     setRepsDraft(String(reps))
+    setRpeDraft(rpe == null ? '' : String(rpe))
     setError(null)
   }
 
@@ -75,6 +80,19 @@ function SessionSetRow({ index, set, onUpdate, onRemove }: SessionSetRowProps) {
           onBlur={commit}
           onKeyDown={handleKeyDown}
         />
+        <span className="session-exercise-card__set-unit">RPE</span>
+        <input
+          className="session-exercise-card__set-input session-exercise-card__set-input--rpe"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          aria-label={`RPE de la serie ${index + 1}`}
+          placeholder="—"
+          value={rpeDraft}
+          onChange={(e) => setRpeDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+        />
         <button
           type="button"
           className="session-exercise-card__set-remove"
@@ -84,6 +102,9 @@ function SessionSetRow({ index, set, onUpdate, onRemove }: SessionSetRowProps) {
           ×
         </button>
       </div>
+      {set.restSeconds != null ? (
+        <p className="session-exercise-card__set-rest">Descanso {set.restSeconds} s</p>
+      ) : null}
       {error ? (
         <p className="session-exercise-card__set-error" role="alert">
           {error}
@@ -97,11 +118,18 @@ type SessionExerciseCardProps = {
   row: SessionExercise
   draftWeight: string
   draftReps: string
+  draftRpe: string
   addSetError: string | null
   onDraftWeightChange: (value: string) => void
   onDraftRepsChange: (value: string) => void
+  onDraftRpeChange: (value: string) => void
   onSubmitSet: (e: FormEvent<HTMLFormElement>) => void
-  onUpdateSet: (localId: string, weight: number, reps: number) => AddSetResult
+  onUpdateSet: (
+    localId: string,
+    weight: number,
+    reps: number,
+    rpe: number | null,
+  ) => AddSetResult
   onRemoveSet: (localId: string) => void
   onRemoveExercise: () => void
 }
@@ -110,9 +138,11 @@ export function SessionExerciseCard({
   row,
   draftWeight,
   draftReps,
+  draftRpe,
   addSetError,
   onDraftWeightChange,
   onDraftRepsChange,
+  onDraftRpeChange,
   onSubmitSet,
   onUpdateSet,
   onRemoveSet,
@@ -121,6 +151,7 @@ export function SessionExerciseCard({
   const baseId = useId()
   const weightId = `${baseId}-weight`
   const repsId = `${baseId}-reps`
+  const rpeId = `${baseId}-rpe`
 
   function handleRemoveExercise() {
     if (row.sets.length > 0) {
@@ -137,14 +168,19 @@ export function SessionExerciseCard({
   return (
     <li className="session-exercise-card">
       <div className="session-exercise-card__header">
-        <h3 className="session-exercise-card__title">
-          <Link
-            className="session-exercise-card__title-link"
-            to={`/exercises/${row.exercise.id}`}
-          >
-            {row.exercise.name}
-          </Link>
-        </h3>
+        <div>
+          <h3 className="session-exercise-card__title">
+            <Link
+              className="session-exercise-card__title-link"
+              to={`/exercises/${row.exercise.id}`}
+            >
+              {row.exercise.name}
+            </Link>
+          </h3>
+          <p className="session-exercise-card__group">
+            {muscleGroupLabel(row.exercise.muscle_group)}
+          </p>
+        </div>
         <button
           type="button"
           className="session-exercise-card__remove-exercise"
@@ -161,7 +197,9 @@ export function SessionExerciseCard({
               key={s.localId}
               index={index}
               set={s}
-              onUpdate={(weight, reps) => onUpdateSet(s.localId, weight, reps)}
+              onUpdate={(weight, reps, rpe) =>
+                onUpdateSet(s.localId, weight, reps, rpe)
+              }
               onRemove={() => onRemoveSet(s.localId)}
             />
           ))}
@@ -204,6 +242,23 @@ export function SessionExerciseCard({
               placeholder="0"
               value={draftReps}
               onChange={(e) => onDraftRepsChange(e.target.value)}
+              enterKeyHint="next"
+            />
+          </div>
+          <div className="session-exercise-card__field session-exercise-card__field--rpe">
+            <label className="session-exercise-card__label" htmlFor={rpeId}>
+              RPE
+            </label>
+            <input
+              id={rpeId}
+              className="session-exercise-card__input"
+              name="rpe"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="—"
+              value={draftRpe}
+              onChange={(e) => onDraftRpeChange(e.target.value)}
               enterKeyHint="done"
             />
           </div>

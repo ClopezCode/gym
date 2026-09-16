@@ -30,6 +30,13 @@
   text-align: left;
 }
 
+.session-exercise-card__group {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .session-exercise-card__remove-exercise {
   flex: none;
   padding: 0.3rem 0.6rem;
@@ -122,9 +129,14 @@
   border-color: #dc2626;
 }
 
-.session-exercise-card__set-unit {
-  flex: none;
-  font-size: 0.85rem;
+.session-exercise-card__set-input--rpe {
+  width: 3.2rem;
+  flex-basis: 3.2rem;
+}
+
+.session-exercise-card__set-rest {
+  margin: 0 0 0.35rem 2rem;
+  font-size: 0.75rem;
   color: var(--text);
 }
 
@@ -175,6 +187,11 @@
   gap: 0.2rem;
   min-width: 4.5rem;
   flex: 1 1 4rem;
+}
+
+.session-exercise-card__field--rpe {
+  flex: 0 1 3.5rem;
+  min-width: 3.5rem;
 }
 
 .session-exercise-card__label {

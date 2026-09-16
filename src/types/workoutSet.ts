@@ -6,6 +6,8 @@ export type WorkoutSetRow = {
   exercise_id: string | null
   weight: number
   reps: number
+  rpe: number | null
+  rest_seconds: number | null
   created_at: string
 }
 

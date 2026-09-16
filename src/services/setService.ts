@@ -10,6 +10,8 @@ type SetRowFromDb = {
   exercise_id: string | null
   weight: number
   reps: number
+  rpe: number | null
+  rest_seconds: number | null
   created_at: string
   exercises: ExerciseEmbed | ExerciseEmbed[] | null
 }
@@ -43,8 +45,10 @@ export async function getSetsForWorkout(
       exercise_id,
       weight,
       reps,
+      rpe,
+      rest_seconds,
       created_at,
-      exercises ( id, name, user_id, created_at )
+      exercises ( id, name, user_id, created_at, muscle_group )
     `,
     )
     .eq('workout_id', workoutId)
@@ -61,6 +65,8 @@ export async function getSetsForWorkout(
     exercise_id: row.exercise_id,
     weight: Number(row.weight),
     reps: row.reps,
+    rpe: row.rpe == null ? null : Number(row.rpe),
+    rest_seconds: row.rest_seconds == null ? null : Number(row.rest_seconds),
     created_at: row.created_at,
     exercise: normalizeExercise(row.exercises),
   }))

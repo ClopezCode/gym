@@ -4,15 +4,21 @@ import type { Exercise } from '../types/exercise'
 import type { SessionExercise } from '../types/workoutSession'
 
 function exercise(id: string, name: string): Exercise {
-  return { id, name, user_id: 'user-1', created_at: '2026-01-01T00:00:00Z' }
+  return {
+    id,
+    name,
+    user_id: 'user-1',
+    created_at: '2026-01-01T00:00:00Z',
+    muscle_group: 'pecho',
+  }
 }
 
 const session: SessionExercise[] = [
   {
     exercise: exercise('ex-1', 'Press banca'),
     sets: [
-      { localId: 'a', weight: 60, reps: 10 },
-      { localId: 'b', weight: 62.5, reps: 8 },
+        { localId: 'a', weight: 60, reps: 10, rpe: null, restSeconds: null },
+        { localId: 'b', weight: 62.5, reps: 8, rpe: 8, restSeconds: 90 },
     ],
   },
 ]
@@ -23,8 +29,8 @@ describe('sessionSignature', () => {
       {
         exercise: exercise('ex-1', 'Press banca'),
         sets: [
-          { localId: 'otro-1', weight: 60, reps: 10 },
-          { localId: 'otro-2', weight: 62.5, reps: 8 },
+          { localId: 'otro-1', weight: 60, reps: 10, rpe: null, restSeconds: null },
+          { localId: 'otro-2', weight: 62.5, reps: 8, rpe: 8, restSeconds: 90 },
         ],
       },
     ]
@@ -37,8 +43,8 @@ describe('sessionSignature', () => {
       {
         exercise: exercise('ex-1', 'Press banca'),
         sets: [
-          { localId: 'a', weight: 65, reps: 10 },
-          { localId: 'b', weight: 62.5, reps: 8 },
+          { localId: 'a', weight: 65, reps: 10, rpe: null, restSeconds: null },
+          { localId: 'b', weight: 62.5, reps: 8, rpe: 8, restSeconds: 90 },
         ],
       },
     ]
@@ -50,7 +56,7 @@ describe('sessionSignature', () => {
     const shorter: SessionExercise[] = [
       {
         exercise: exercise('ex-1', 'Press banca'),
-        sets: [{ localId: 'a', weight: 60, reps: 10 }],
+        sets: [{ localId: 'a', weight: 60, reps: 10, rpe: null, restSeconds: null }],
       },
     ]
 
